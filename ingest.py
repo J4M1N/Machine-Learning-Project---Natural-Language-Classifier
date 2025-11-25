@@ -1,9 +1,11 @@
-
+from sklearn.model_selection import train_test_split
 import os
 import pandas as pd
 import json
 import logging
 import requests
+import pickle
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 #def download_dataset(self, data):
     # dataset_path = "/Downloads/sms+spam+collection/SMSSpamCollection"
@@ -13,6 +15,8 @@ import requests
 parq_df = pd.read_parquet("hf://datasets/dair-ai/emotion/unsplit/train-00000-of-00001.parquet")
 print(parq_df)
 new_dataset = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.csv"
+X = text
+y = label
 def download_dataset(parq_df:str, new_dataset:str):
     try:
          # Ensure the directory exists
@@ -61,3 +65,33 @@ def logging_data():
     
       logging.warning("This is a warning message")  # Warning example
       logging.info("Script finished")  # Script completion message
+
+
+# def train_model():
+#     with open('new_dataset', 'r' encoding='utf-8') as f:
+#         read_object = json.load(f)
+
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
+
+class SmsClassifier:
+    def __init__(self, model_path: str, vectorizer_path: str):
+        model_path = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/trained_model.pkl"
+        # Load the trained model
+        try:
+            with open(model_path, 'rb') as f:
+                self.model = pickle.load(f)
+        except FileNotFoundError:
+            raise Exception(f"Model file not found at: {model_path}")
+
+
+    # Load the TF-IDF vectorizer
+        try:
+            with open(vectorizer_path, 'rb') as f:
+                self.vectorizer = pickle.load(f)
+        except FileNotFoundError:
+            raise Exception(f"Vectorizer file not found at: {vectorizer_path}")
+        
+    def predict(self, message: str):
+        features = self.vectorizer.transform([message]) # Transform the message using the TF-IDF vectorizer
+        prediction = self.model.predict(features)[0]  # Predict using the loaded model
+        return prediction
