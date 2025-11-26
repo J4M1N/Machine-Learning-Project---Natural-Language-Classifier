@@ -6,36 +6,17 @@ import logging
 import requests
 import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
+import fastparquet
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+import sys
 
-#def download_dataset(self, data):
-    # dataset_path = "/Downloads/sms+spam+collection/SMSSpamCollection"
-    # cleaned_data_path = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.csv" 
-    # new_dataset = new_dataset.csv
-    
-parq_df = pd.read_parquet("hf://datasets/dair-ai/emotion/unsplit/train-00000-of-00001.parquet")
-print(parq_df)
-new_dataset = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.csv"
-X = text
-y = label
-def download_dataset(parq_df:str, new_dataset:str):
+
+def download_dataset():
+    df = pd.read_parquet("hf://datasets/dair-ai/emotion/unsplit/train-00000-of-00001.parquet")
+    print(df)
+    new_dataset = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.json"
     try:
-         # Ensure the directory exists
-        os.makedirs(os.path.dirname(new_dataset), exist_ok=True)
-        print(f"Downloading dataset from {parq_df}...")
-        response = requests.get(parq_df)
-        response.raise_for_status() # Raise HTTPError for bad responses
-
-     # Save content to file
-        parq_df.to_json(new_dataset, orient='records', lines=True)
-
-        print(f"Dataset successfully downloaded and saved to {new_dataset}.")
-    except requests.exceptions.RequestException as e:
-        print(f"Error downloading dataset: {e}")
-    except OSError as e:
-        print(f"Error saving dataset: {e}")
-
-    try:
-        df = pd.read_json(new_dataset)
         df.dropna(how='all', inplace=True) # Drop rows that are completely empty
         df.drop_duplicates(inplace=True) # Remove duplicate rows
         df.to_json(new_dataset, index=False) # Save cleaned dataset
@@ -43,15 +24,20 @@ def download_dataset(parq_df:str, new_dataset:str):
     except Exception as e:
         print(f"Error cleaning dataset: {e}")
 
+     # Save content to file
+    df.to_json(new_dataset, orient='records', indent=4)
+download_dataset()
 
-logging.basicConfig(
-    level=logging.INFO,  # Set minimum log level to INFO
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
-    handlers=[
-        logging.FileHandler("script_activity.log"),  # Log to a file
-        logging.StreamHandler()  # Log to console
-    ]
-)
+
+
+# logging.basicConfig(
+#     level=logging.INFO,  # Set minimum log level to INFO
+#     format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
+#     handlers=[
+#         logging.FileHandler("script_activity.log"),  # Log to a file
+#         logging.StreamHandler()  # Log to console
+#     ]
+# )
 
 def logging_data():
    logging.info("Script started")  # Replaces: print("Script started")
@@ -67,13 +53,8 @@ def logging_data():
       logging.info("Script finished")  # Script completion message
 
 
-# def train_model():
-#     with open('new_dataset', 'r' encoding='utf-8') as f:
-#         read_object = json.load(f)
 
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
-
-class SmsClassifier:
+class EmotionClassifier:
     def __init__(self, model_path: str, vectorizer_path: str):
         model_path = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/trained_model.pkl"
         # Load the trained model
@@ -91,7 +72,42 @@ class SmsClassifier:
         except FileNotFoundError:
             raise Exception(f"Vectorizer file not found at: {vectorizer_path}")
         
-    def predict(self, message: str):
-        features = self.vectorizer.transform([message]) # Transform the message using the TF-IDF vectorizer
+        
+    def predict(self, content: str):
+        features = self.vectorizer.transform([content]) # Transform the content using the TF-IDF vectorizer
         prediction = self.model.predict(features)[0]  # Predict using the loaded model
         return prediction
+
+
+    def prompt_user(self, emotion_input=str):
+        print("Emotion Classifier is running. Enter your message below.")
+        print("Type 'exit' to quit the program.")
+        labels_and_emotions = {
+            0: "sadness",
+            1: "joy",
+            2: "love",
+            3: "anger",
+            4: "fear",
+            5: "surprise"
+        }
+        for label, emotion in labels_and_emotions.items():
+            if label.isdigit():
+                label = int(label)
+                return emotion
+        while True:
+        # Get user input
+            emotion_input = input("Enter input here: ").strip()
+        
+        # Check if user wants to exit
+            if emotion_input.lower() == 'exit':
+                print("Exiting emotion Classifier. Goodbye!")
+            break
+        # Classify the emotion
+        result = labels_and_emotions.get(emotion)
+        # Display result
+        print(f"Result: {result}")
+        return result
+    
+
+    def chatbot_interface():
+

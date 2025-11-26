@@ -10,10 +10,11 @@ def test_new_dataset_has_been_saved(tmp_path):
     assert not test_file.exists()
     
     # Call the function to create the file
-    create_file(test_file, content="Hello, pytest!")
+    create_file = test_file.exists()
+    create_file(test_file, content=" ")#content="Hello, pytest!"
     
     # Check if the file now exists
-    assert test_file.exists(), f"File {test_file} was not created"
+    assert test_file.exists()#, f"File {test_file} was not created"
     
     # Optional: Verify the file content
     with open(test_file, "r") as f:
