@@ -9,24 +9,28 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import fastparquet
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
-import sys
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
 
 
-def download_dataset():
+def download_dataset(path):
     df = pd.read_parquet("hf://datasets/dair-ai/emotion/unsplit/train-00000-of-00001.parquet")
-    print(df)
-    new_dataset = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.json"
+
+    #new_dataset = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.json"
+    
     try:
         df.dropna(how='all', inplace=True) # Drop rows that are completely empty
         df.drop_duplicates(inplace=True) # Remove duplicate rows
-        df.to_json(new_dataset, index=False) # Save cleaned dataset
-        print(f"Cleaned dataset saved to {new_dataset}.")
+        df.to_json(path, index=False) # Save cleaned dataset
+        print(f"Cleaned dataset saved to {path}.")
     except Exception as e:
         print(f"Error cleaning dataset: {e}")
 
      # Save content to file
-    df.to_json(new_dataset, orient='records', indent=4)
-download_dataset()
+     
+    df.to_json(path, orient='records', indent=4)
+if __name__ == "__main__":
+    download_dataset("/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/new_dataset.json")
 
 
 
@@ -39,18 +43,18 @@ download_dataset()
 #     ]
 # )
 
-def logging_data():
-   logging.info("Script started")  # Replaces: print("Script started")
+# def logging_data():
+#    logging.info("Script started")  # Replaces: print("Script started")
     
-   try:
-      logging.debug("Attempting some debug operation")  # Detailed debug info
-      result = 10 / 2
-      logging.info(f"Computation successful, result = {result}")  # Info level log
-   except Exception as e:
-      logging.error("An error occurred", exc_info=True)  # Logs error with traceback
+#    try:
+#       logging.debug("Attempting some debug operation")  # Detailed debug info
+#       result = 10 / 2
+#       logging.info(f"Computation successful, result = {result}")  # Info level log
+#    except Exception as e:
+#       logging.error("An error occurred", exc_info=True)  # Logs error with traceback
     
-      logging.warning("This is a warning message")  # Warning example
-      logging.info("Script finished")  # Script completion message
+#       logging.warning("This is a warning message")  # Warning example
+#       logging.info("Script finished")  # Script completion message
 
 
 
@@ -91,9 +95,8 @@ class EmotionClassifier:
             5: "surprise"
         }
         for label, emotion in labels_and_emotions.items():
-            if label.isdigit():
-                label = int(label)
-                return emotion
+            label == int(label)
+            emotion == labels_and_emotions.get(emotion)
         while True:
         # Get user input
             emotion_input = input("Enter input here: ").strip()
@@ -103,11 +106,46 @@ class EmotionClassifier:
                 print("Exiting emotion Classifier. Goodbye!")
             break
         # Classify the emotion
-        result = labels_and_emotions.get(emotion)
+        result = emotion #labels_and_emotions.get
         # Display result
         print(f"Result: {result}")
         return result
-    
+    #prompt_user(prompt_user)    
 
-    def chatbot_interface():
+    def chatbot_interface(model_name, response_mapping=None, device=None):
+        model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForCausalLM.from_pretrained(model_name)
 
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"Loading TinyLlama model '{model_name}' on device '{device}'...")
+            model.to(device)
+            model.eval()
+
+        if response_mapping is None:
+        # Default fallback responses if needed
+            response_mapping = {
+                'greeting': 'Hello! How can I help you today?',
+                'farewell': 'Goodbye! Have a great day.',
+                'thanks': 'You are welcome!',
+                'fallback': "I'm not sure how to respond to that."
+            }
+
+            print("Chatbot is ready! Type 'exit' to quit.")
+
+        while True:
+            user_input = input("You: ").strip()
+            if user_input.lower() == 'exit':
+                print("Chatbot: Goodbye!")
+                break
+
+        # Encode input and generate response from TinyLlama
+        inputs = tokenizer.encode(user_input, return_tensors="pt").to(device)
+        with torch.no_grad():
+            outputs = model.generate(inputs, max_length=150, do_sample=True, temperature=0.7)
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            return response
+        
+            
+ 
