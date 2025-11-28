@@ -10,6 +10,7 @@ import fastparquet
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 import torch
 
 
@@ -34,27 +35,27 @@ if __name__ == "__main__":
 
 
 
-# logging.basicConfig(
-#     level=logging.INFO,  # Set minimum log level to INFO
-#     format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
-#     handlers=[
-#         logging.FileHandler("script_activity.log"),  # Log to a file
-#         logging.StreamHandler()  # Log to console
-#     ]
-# )
+logging.basicConfig(
+    level=logging.INFO,  # Set minimum log level to INFO
+    format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
+    handlers=[
+        logging.FileHandler("script_activity.log"),  # Log to a file
+        logging.StreamHandler()  # Log to console
+    ]
+)
 
-# def logging_data():
-#    logging.info("Script started")  # Replaces: print("Script started")
+def logging_data():
+   logging.info("Script started")  # Replaces: print("Script started")
     
-#    try:
-#       logging.debug("Attempting some debug operation")  # Detailed debug info
-#       result = 10 / 2
-#       logging.info(f"Computation successful, result = {result}")  # Info level log
-#    except Exception as e:
-#       logging.error("An error occurred", exc_info=True)  # Logs error with traceback
+   try:
+      logging.debug("Attempting some debug operation")  # Detailed debug info
+      result = 10 / 2
+      logging.info(f"Computation successful, result = {result}")  # Info level log
+   except Exception as e:
+      logging.error("An error occurred", exc_info=True)  # Logs error with traceback
     
-#       logging.warning("This is a warning message")  # Warning example
-#       logging.info("Script finished")  # Script completion message
+      logging.warning("This is a warning message")  # Warning example
+      logging.info("Script finished")  # Script completion message
 
 
 
@@ -116,12 +117,33 @@ class EmotionClassifier:
         model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModelForCausalLM.from_pretrained(model_name)
+        system_prompt = """<|system|>\nYou are TinyLlama, a friendly assistant who responds based on the emotion results of a classification in natural language.
+                            Respond according to the following detected emotion:
+                            0: "sadness", Give an empathetic, gentle, supportive Response,
+                            1: "joy", Give a cheerful, playful, positive response,
+                            2: "love", Give a Romantic response,
+                            3: "anger", Give an angry agressive response,
+                            4: "fear", Give a nervous, Scared response,
+                            5: "surprise", Give a Surprised Response<|end|>\n"""
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             print(f"Loading TinyLlama model '{model_name}' on device '{device}'...")
             model.to(device)
             model.eval()
+
+        classifier_path = 'vectorizer.pkl'
+        if not os.path.exists(classifier_path):
+            raise FileNotFoundError(f"Classifier file not found at {classifier_path}")
+    
+        with open(classifier_path, "rb") as f:
+            classifier = pickle.load(f)
+            #return classifier
+        
+        chatbot = {
+            "model": model_name,
+            "classifier": classifier
+        }
 
         if response_mapping is None:
         # Default fallback responses if needed
@@ -134,18 +156,42 @@ class EmotionClassifier:
 
             print("Chatbot is ready! Type 'exit' to quit.")
 
+        model_name = chatbot["model"]
+        classifier = chatbot["classifier"]
+        #bot = EmotionClassifier()
+        #predicted_emotion = self.prompt_user.emotion
+
+        transparent_response = (
+        f"I detected that your emotion might be '{classifier}'."
+        f"Model evaluation metrics: "
+        f"- Accuracy: {accuracy_score:.2f}"
+        f"- Precision: {precision_score:.2f}"
+        f"- Recall: {recall_score:.2f}"
+        f"- F1 Score: {f1_score:.2f}"
+    )
+                
+        # prompts = [
+        #     "What is thy name??."
+        #     "What does one think about AI?"
+        # ]
+
+        # for prompt in prompts:
+        #print(system_prompt)
         while True:
             user_input = input("You: ").strip()
+            #reply = outputs(system_prompt)
+            print(transparent_response.system_prompt)
             if user_input.lower() == 'exit':
                 print("Chatbot: Goodbye!")
                 break
 
         # Encode input and generate response from TinyLlama
-        inputs = tokenizer.encode(user_input, return_tensors="pt").to(device)
-        with torch.no_grad():
-            outputs = model.generate(inputs, max_length=150, do_sample=True, temperature=0.7)
-            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            return response
+            inputs = tokenizer.encode(user_input, return_tensors="pt").to(device)
+            with torch.no_grad():
+                outputs = model.generate(inputs, max_length=150, do_sample=True, temperature=0.7)
+                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    #return response
+                print(response)
         
-            
- 
+    chatbot_interface(chatbot_interface)
+    #print(bot.system_prompt)
