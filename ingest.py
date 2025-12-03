@@ -9,10 +9,16 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import fastparquet
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 import torch
-
+from peft import LoraConfig, get_peft_model
+from trained_model import train_model
+from tinyllama import TinyLlama
+from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
 
 def download_dataset(path):
     df = pd.read_parquet("hf://datasets/dair-ai/emotion/unsplit/train-00000-of-00001.parquet")
@@ -37,7 +43,7 @@ if __name__ == "__main__":
 
 logging.basicConfig(
     level=logging.INFO,  # Set minimum log level to INFO
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
+    format='%(asctime)s - %(levelname)s - %(message)s - Chat History: [%(chat_history)s]',  # Log format
     handlers=[
         logging.FileHandler("script_activity.log"),  # Log to a file
         logging.StreamHandler()  # Log to console
@@ -125,6 +131,42 @@ class EmotionClassifier:
                             3: "anger", Give an angry agressive response,
                             4: "fear", Give a nervous, Scared response,
                             5: "surprise", Give a Surprised Response<|end|>\n"""
+        
+        chat_history = system_prompt + """
+            <|user|>
+            Hello, how art thou today?<|end|>
+            <|assistant|>
+            Verily, I am well, kind soul. How fare thee?<|end|>
+            <|user|>
+            What thinkest thou of the weather?<|end|>
+            <|assistant|>
+            The heavens weep or smile, as doth the mood of fate. 'Tis fair today, by mine eye.<|end|>
+        """
+
+        # Configure LoRA
+        lora_config = LoraConfig(
+            r=8,
+            lora_alpha=32,
+            target_modules=["c_attn"],
+            lora_dropout=0.1,
+            bias="none"
+        )
+
+        model = get_peft_model(model, lora_config)
+
+        # Example training arguments
+        training_args = TrainingArguments(
+            output_dir="./lora_model",
+            per_device_train_batch_size=4,
+            num_train_epochs=3,
+            logging_steps=10,
+        )
+
+        trainer = Trainer(
+            model=model,
+            train_dataset=train_model,  # your dataset here
+            args=training_args,
+        )
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -187,6 +229,15 @@ class EmotionClassifier:
 
         # Encode input and generate response from TinyLlama
             inputs = tokenizer.encode(user_input, return_tensors="pt").to(device)
+            chat_history_ids = [] #history list
+            if inputs.to(device) not in chat_history_ids:
+                input_text = inputs.to(device)
+            else:
+        # First message: only include the current prompt
+                input_text = " ".join(chat_history_ids) + " " + inputs.to(device)
+       
+        #user_tokens = self.tokenizer.encode(input_ids, return_tensors="pt")
+            chat_history = chat_history_ids.append(inputs.to(device))
             with torch.no_grad():
                 outputs = model.generate(inputs, max_length=150, do_sample=True, temperature=0.7)
                 response = tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -195,3 +246,42 @@ class EmotionClassifier:
         
     chatbot_interface(chatbot_interface)
     #print(bot.system_prompt)
+
+    def Rag_memory(question: str): # Function to ask the chatbot with memory
+        model_path = "/home/allen11/Machine-Learning-Project---Natural-Language-Classifier/trained_model.pkl"
+        model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        chatbot = TinyLlama(model_path)# Initialize your chatbot
+        embeddings = SentenceTransformerEmbeddings(model_name) # Create embeddings for memory
+
+        memory_store = FAISS(embedding_function=embeddings) # Initialize a FAISS vector store for storing conversation memory
+
+        # Create a simple prompt template for RAG
+        prompt_template = """
+        You are a helpful assistant with memory. Given the following retrieved memory and the input question, provide a response.
+
+        Memory: {context}
+        Question: {question}
+        Answer: {answer}
+        """
+        prompt = PromptTemplate(
+            template=prompt_template,
+            input_variables=["context", "question"]
+        )
+
+        # Build the Retrieval QA chain
+        rag_chain = RetrievalQA.from_chain_type(
+            llm=chatbot,
+            retriever=memory_store.as_retriever(search_kwargs={"k": 5}),
+            chain_type="stuff",
+            chain_type_kwargs={"prompt": prompt}
+        )
+
+        
+        answer = rag_chain.run(question) # Retrieve answer with RAG
+    
+    # Store this Q&A in memory for future retrieval
+        memory_store.add_texts([f"Q: {question}",
+                                f"A:{answer}"]
+                            )
+        return answer
+        

@@ -8,6 +8,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
 import joblib
+from peft import LoraConfig, get_peft_model
 
 RANDOM_SEED = 1276
 def train_model():
